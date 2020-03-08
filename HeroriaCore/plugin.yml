@@ -1,10 +1,21 @@
  name: HeroriaCore
  version: 2.0
  description: Bibliothèque pour les plugins Heroria.
- author: IceOrange92
+ author: alphaice
  main: eu.heroria.Main
- 
+ api-version: 1.13
  commands:
-   test:
-     description: commande de test
+   player:
+     description: Ouvrir l'interface graphique de gestion d'utilisateur
+     
+   shop:
+     description: Ouvrir l'interface graphique d'achat de grade
+     
+   rec:
+     description: Ajouter une récompense à un joueur
+     
+   warn:
+     description: Ajouter un avertissement
    
+   rank:
+     description: Définir le rank d'un utilisateur

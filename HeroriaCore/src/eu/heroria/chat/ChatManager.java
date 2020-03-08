@@ -24,7 +24,11 @@ public class ChatManager implements Listener {
 			pl.heroriaMessage("Votre message ne peut pas être envoyé, il contient des éléments prohibé.", player);
 			pl.warnPlayer(player, "message prohibé", "HeroriaCore");
 		}
-		if(pl.getFaction(player) == Faction.NF) event.setFormat(pl.getRank(player).getName() + pl.getRank(player).getTag() + player.getCustomName() + "§r\\ " + msg);
-		else event.setFormat("§r[" + pl.getFaction(player).getTag() + pl.getFaction(player).getName() + "$r] " + pl.getRank(player).getName() + pl.getRank(player).getTag() + player.getCustomName() + "§r/ " + msg);
+		if(pl.getFaction(player) == Faction.NF) event.setFormat(pl.getRank(player).getName() + pl.getRank(player).getTag() + " " + player.getCustomName() + "§8\\§r " + msg);
+		else {
+			String faction = "§r[" + pl.getFaction(player).getTag() + pl.getFaction(player).getName() + "§r] ";
+			if(pl.getSeeFaction()) event.setFormat(faction + pl.getRank(player).getName() + pl.getRank(player).getTag() + " " + player.getCustomName() + "§8\\§r " + msg);
+			else event.setFormat(pl.getRank(player).getName() + pl.getRank(player).getTag() + " " + player.getCustomName() + "§8\\§r " + msg);
+		}
 	}
 }

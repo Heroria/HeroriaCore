@@ -15,7 +15,9 @@ public class ProhibitedWordManager {
 	}
 	
 	public boolean containsProhibitedWord(String msg) {
-		if(prohibitedWord.contains(msg.toLowerCase())) return true;
+		for (String string : prohibitedWord) {
+			if(msg.toLowerCase().contains(string.toLowerCase())) return true;
+		}
 		return false;
 	}
 }

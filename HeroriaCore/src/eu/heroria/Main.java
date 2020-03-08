@@ -18,7 +18,9 @@ import org.bukkit.plugin.java.JavaPlugin;
 
 import eu.heroria.chat.ChatManager;
 import eu.heroria.chat.ProhibitedWordManager;
-import eu.heroria.npc.NpcManager;
+import eu.heroria.gui.CustomScoreBoardManager;
+import eu.heroria.gui.PlayerGUI;
+import eu.heroria.gui.ShopGUI;
 import eu.heroria.playerdata.Faction;
 import eu.heroria.playerdata.PlayerData;
 import eu.heroria.playerdata.PlayerDataManager;
@@ -26,31 +28,38 @@ import eu.heroria.playerdata.Rank;
 import eu.heroria.playerdata.Request;
 
 public class Main extends JavaPlugin {
+	private boolean seeFaction = true;
 	public Request sql;
-	public NpcManager npc = new NpcManager();
 	public PlayerDataManager dataManager = new PlayerDataManager(this);
 	public ProhibitedWordManager prohibitedWord = new ProhibitedWordManager();
+	public PlayerGUI playerGUI = new PlayerGUI(this);
+	public ShopGUI shopGUI = new ShopGUI(this);
 	public Map<Player, PlayerData> dataPlayers = new HashMap<>();
 	public Map<UUID, PermissionAttachment> playerPermission = new HashMap<>();
+	public Map<Player, CustomScoreBoardManager> scoreBoard = new HashMap<>();
 	
 	public void onEnable() {
 		getServer().getPluginManager().registerEvents(new ChatManager(this), this);
 		getServer().getPluginManager().registerEvents(new Listener(this), this);
-		getCommand("test").setExecutor(new Listener(this));
+		getServer().getPluginManager().registerEvents(new PlayerGUI(this), this);
+		getServer().getPluginManager().registerEvents(new ShopGUI(this), this);
+		getCommand("rec").setExecutor(new Listener(this));
+		getCommand("player").setExecutor(new Listener(this));
+		getCommand("shop").setExecutor(new Listener(this));
+		getCommand("warn").setExecutor(new Listener(this));
+		getCommand("rank").setExecutor(new Listener(this));
 		sql = new Request(this, "jdbc:mysql://", "localhost", "heroria", "root", "");
 		sql.connection();
 		prohibitedWord.addRule("bite");
+		new Refresh(this).runTaskTimer(this, 0L, 20L);
 	}
 	
-	public void onDisable() {
-		for (World world : Bukkit.getServer().getWorlds()) {
-			for(Entity entity : world.getEntities()) {
-				entity.remove();
-			}
-		}
-		for(Player player : Bukkit.getOnlinePlayers()) {
-			player.kickPlayer(getServer().getShutdownMessage());
-		}
+	public void seeFaction(boolean seeFaction) {
+		this.seeFaction = seeFaction;
+	}
+	
+	public boolean getSeeFaction() {
+		return seeFaction;
 	}
 	
 	public int getMoney(Player player) {
@@ -105,176 +114,6 @@ public class Main extends JavaPlugin {
 		return Faction.NF;
 	}
 	
-	public void setPrimaryQuest(Player player, int power) {
-		if(dataPlayers.containsKey(player)) {
-			PlayerData playerData = dataPlayers.get(player);
-			playerData.setPrimaryQuest(power);
-			dataPlayers.remove(player);
-			dataPlayers.put(player, playerData);
-		}
-	}
-	
-	public int getPrimaryQuest(Player player) {
-		if(dataPlayers.containsKey(player)) {
-			PlayerData playerData = dataPlayers.get(player);
-			return playerData.getPrimaryQuest();
-		}
-		return 0;
-	}
-	
-	public void setPrimaryQuestStat(Player player, int power) {
-		if(dataPlayers.containsKey(player)) {
-			PlayerData playerData = dataPlayers.get(player);
-			playerData.setPrimaryQuestStat(power);
-			dataPlayers.remove(player);
-			dataPlayers.put(player, playerData);
-		}
-	}
-	
-	public int getPrimaryQuestStat(Player player) {
-		if(dataPlayers.containsKey(player)) {
-			PlayerData playerData = dataPlayers.get(player);
-			return playerData.getPrimaryQuestStat();
-		}
-		return 0;
-	}
-	
-	public void setSecondaryQuest1(Player player, int power) {
-		if(dataPlayers.containsKey(player)) {
-			PlayerData playerData = dataPlayers.get(player);
-			playerData.setSecondaryQuest1(power);
-			dataPlayers.remove(player);
-			dataPlayers.put(player, playerData);
-		}
-	}
-	
-	public int getSecondaryQuest1(Player player) {
-		if(dataPlayers.containsKey(player)) {
-			PlayerData playerData = dataPlayers.get(player);
-			return playerData.getSecondaryQuest1();
-		}
-		return 0;
-	}
-	
-	public void setSecondaryQuest1Stat(Player player, int power) {
-		if(dataPlayers.containsKey(player)) {
-			PlayerData playerData = dataPlayers.get(player);
-			playerData.setSecondaryQuest1Stat(power);
-			dataPlayers.remove(player);
-			dataPlayers.put(player, playerData);
-		}
-	}
-	
-	public int getSecondaryQuest1Stat(Player player) {
-		if(dataPlayers.containsKey(player)) {
-			PlayerData playerData = dataPlayers.get(player);
-			return playerData.getSecondaryQuest1Stat();
-		}
-		return 0;
-	}
-	
-	public void setSecondaryQuest2(Player player, int power) {
-		if(dataPlayers.containsKey(player)) {
-			PlayerData playerData = dataPlayers.get(player);
-			playerData.setSecondaryQuest2(power);
-			dataPlayers.remove(player);
-			dataPlayers.put(player, playerData);
-		}
-	}
-	
-	public int getSecondaryQuest2(Player player) {
-		if(dataPlayers.containsKey(player)) {
-			PlayerData playerData = dataPlayers.get(player);
-			return playerData.getSecondaryQuest2();
-		}
-		return 0;
-	}
-	
-	public void setSecondaryQuest2Stat(Player player, int power) {
-		if(dataPlayers.containsKey(player)) {
-			PlayerData playerData = dataPlayers.get(player);
-			playerData.setSecondaryQuest2Stat(power);
-			dataPlayers.remove(player);
-			dataPlayers.put(player, playerData);
-		}
-	}
-	
-	public int getSecondaryQuest2Stat(Player player) {
-		if(dataPlayers.containsKey(player)) {
-			PlayerData playerData = dataPlayers.get(player);
-			return playerData.getSecondaryQuest2Stat();
-		}
-		return 0;
-	}
-	
-	public void setSecondaryQuest3(Player player, int power) {
-		if(dataPlayers.containsKey(player)) {
-			PlayerData playerData = dataPlayers.get(player);
-			playerData.setSecondaryQuest3(power);
-			dataPlayers.remove(player);
-			dataPlayers.put(player, playerData);
-		}
-	}
-	
-	public int getSecondaryQuest3(Player player) {
-		if(dataPlayers.containsKey(player)) {
-			PlayerData playerData = dataPlayers.get(player);
-			return playerData.getSecondaryQuest3();
-		}
-		return 0;
-	}
-	
-	public void setSecondaryQuest3Stat(Player player, int power) {
-		if(dataPlayers.containsKey(player)) {
-			PlayerData playerData = dataPlayers.get(player);
-			playerData.setSecondaryQuest3Stat(power);
-			dataPlayers.remove(player);
-			dataPlayers.put(player, playerData);
-		}
-	}
-	
-	public int getSecondaryQuest3Stat(Player player) {
-		if(dataPlayers.containsKey(player)) {
-			PlayerData playerData = dataPlayers.get(player);
-			return playerData.getSecondaryQuest3Stat();
-		}
-		return 0;
-	}
-	
-	public void setSecretQuest(Player player, int power) {
-		if(dataPlayers.containsKey(player)) {
-			PlayerData playerData = dataPlayers.get(player);
-			playerData.setSecretQuest(power);
-			dataPlayers.remove(player);
-			dataPlayers.put(player, playerData);
-		}
-	}
-	
-	public int getSecretQuest(Player player) {
-		if(dataPlayers.containsKey(player)) {
-			PlayerData playerData = dataPlayers.get(player);
-			return playerData.getSecretQuest();
-		}
-		return 0;
-	}
-	
-	public void setSecretQuestStat(Player player, int power) {
-		if(dataPlayers.containsKey(player)) {
-			PlayerData playerData = dataPlayers.get(player);
-			playerData.setSecretQuestStat(power);
-			dataPlayers.remove(player);
-			dataPlayers.put(player, playerData);
-		}
-	}
-	
-	public int getSecretQuestStat(Player player) {
-		if(dataPlayers.containsKey(player)) {
-			PlayerData playerData = dataPlayers.get(player);
-			return playerData.getSecretQuestStat();
-		}
-		return 0;
-	}
-	
 	public int getReputation(Player player) {
 		if(dataPlayers.containsKey(player)) {
 			PlayerData playerData = dataPlayers.get(player);
@@ -311,7 +150,7 @@ public class Main extends JavaPlugin {
 	
 	public void ban(Player player, int duration, String reason, String by) {
 		sql.ban(player, duration, reason, by);
-		player.kickPlayer("Vous avez été bannis " + duration + " jour(s) pour " + reason + " par " + by + ".");
+		player.kickPlayer("Vous avez été bannis " + duration + " jour(s)" + " par " + by + " pour la raison suivante\n" + reason);
 	}
 	
 	public ItemStack setIS(String name, Material material, String lore) {
@@ -331,7 +170,59 @@ public class Main extends JavaPlugin {
 		int warn = getWarn(player) + 1;
 		setWarn(player, warn);
 		if(reason == null) player.sendTitle("§4Avertissement", ChatColor.GOLD + "Vous avez reçu un avertissement.");
-		else player.sendTitle("Avertissement", "Vous avez reçu un avertissement pour:" + reason + ".");
+		else player.sendTitle("§4Avertissement", ChatColor.GOLD + "Vous avez reçu un avertissement pour: ' " + reason + "'.");
 		System.out.println("Player " + player.getDisplayName() + " (UUID: " + player.getUniqueId().toString() + ") has been warned by " + by + " for the following reason: '" + reason + "'.");
+	}
+	
+	public void setupPermissions(Player player) {
+		permissionSetter(player);
+	}
+
+	private void permissionSetter(Player player) {
+		PermissionAttachment attachment = player.addAttachment(this);
+		Rank rank = getRank(player);
+		switch(rank) {
+			case JOUEUR:
+				attachment.setPermission("heroria.player", true);
+				break;
+			case VIP1:
+				attachment.setPermission("heroria.player", true);
+				break;
+			case VIP2:
+				attachment.setPermission("heroria.player", true);
+				break;
+			case VIP3:
+				attachment.setPermission("heroria.player", true);
+				break;
+			case VIP4:
+				attachment.setPermission("heroria.player", true);
+				break;
+			case MODO:
+				attachment.setPermission("minecraft.command.kill", true);
+				attachment.setPermission("heroria.player", true);
+				attachment.setPermission("heroria.modo", true);
+				break;
+			
+			case SM:
+				attachment.setPermission("minecraft.command.*", true);
+				attachment.setPermission("heroria.player", true);
+				attachment.setPermission("heroria.modo", true);
+				break;
+				
+			case CM:
+				attachment.setPermission("minecraft.command.*", true);
+				attachment.setPermission("bukkit.command.restart", true);
+				attachment.setPermission("heroria.*", true);
+				break;
+				
+			case ADMINISTRATEUR:
+				attachment.setPermission("*", true);
+				break;
+				
+			default:
+				break;
+		
+		}
+		this.playerPermission.put(player.getUniqueId(), attachment);
 	}
 }

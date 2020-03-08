@@ -6,7 +6,7 @@ import java.util.Map;
 import org.bukkit.ChatColor;
 
 public enum Faction {
-	NF(0, null, null),
+	NF(0, "Aucune", null),
 	ALPHA(1, "α", ChatColor.RED),
 	OMEGA(2, "Ω", ChatColor.BLUE);
 	
