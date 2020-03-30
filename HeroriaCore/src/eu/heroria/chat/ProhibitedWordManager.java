@@ -2,8 +2,6 @@ package eu.heroria.chat;
 
 import java.util.ArrayList;
 
-import eu.heroria.Main;
-
 public class ProhibitedWordManager {
 	private ArrayList<String> prohibitedWord = new ArrayList<String>();
 	

@@ -7,6 +7,7 @@ import org.bukkit.event.player.AsyncPlayerChatEvent;
 
 import eu.heroria.Main;
 import eu.heroria.playerdata.Faction;
+import eu.heroria.playerdata.Rank;
 
 public class ChatManager implements Listener {
 	private Main pl;
@@ -23,6 +24,9 @@ public class ChatManager implements Listener {
 			event.setCancelled(true);
 			pl.heroriaMessage("Votre message ne peut pas être envoyé, il contient des éléments prohibé.", player);
 			pl.warnPlayer(player, "message prohibé", "HeroriaCore");
+		}
+		if(pl.getRank(player).getPower() >= Rank.VIP1.getPower()) {
+			msg = msg.replace('&', '§');
 		}
 		if(pl.getFaction(player) == Faction.NF) event.setFormat(pl.getRank(player).getName() + pl.getRank(player).getTag() + " " + player.getCustomName() + "§8\\§r " + msg);
 		else {

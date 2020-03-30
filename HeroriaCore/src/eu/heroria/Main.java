@@ -5,11 +5,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
-import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Material;
-import org.bukkit.World;
-import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
@@ -21,6 +18,7 @@ import eu.heroria.chat.ProhibitedWordManager;
 import eu.heroria.gui.CustomScoreBoardManager;
 import eu.heroria.gui.PlayerGUI;
 import eu.heroria.gui.ShopGUI;
+import eu.heroria.item.ItemListener;
 import eu.heroria.playerdata.Faction;
 import eu.heroria.playerdata.PlayerData;
 import eu.heroria.playerdata.PlayerDataManager;
@@ -29,6 +27,7 @@ import eu.heroria.playerdata.Request;
 
 public class Main extends JavaPlugin {
 	private boolean seeFaction = true;
+	public Refresh refresh = new Refresh(this);
 	public Request sql;
 	public PlayerDataManager dataManager = new PlayerDataManager(this);
 	public ProhibitedWordManager prohibitedWord = new ProhibitedWordManager();
@@ -43,15 +42,16 @@ public class Main extends JavaPlugin {
 		getServer().getPluginManager().registerEvents(new Listener(this), this);
 		getServer().getPluginManager().registerEvents(new PlayerGUI(this), this);
 		getServer().getPluginManager().registerEvents(new ShopGUI(this), this);
+		getServer().getPluginManager().registerEvents(new ItemListener(this), this);
 		getCommand("rec").setExecutor(new Listener(this));
 		getCommand("player").setExecutor(new Listener(this));
 		getCommand("shop").setExecutor(new Listener(this));
 		getCommand("warn").setExecutor(new Listener(this));
 		getCommand("rank").setExecutor(new Listener(this));
-		sql = new Request(this, "jdbc:mysql://", "localhost", "heroria", "root", "");
+		sql = new Request(this, "jdbc:mysql://", "localhost", "heroria", "", "");
 		sql.connection();
 		prohibitedWord.addRule("bite");
-		new Refresh(this).runTaskTimer(this, 0L, 20L);
+		refresh.runTaskTimer(this, 0L, 20L);
 	}
 	
 	public void seeFaction(boolean seeFaction) {
@@ -86,6 +86,7 @@ public class Main extends JavaPlugin {
 			playerData.setRank(rank);
 			dataPlayers.remove(player);
 			dataPlayers.put(player, playerData);
+			setupPermissions(player);
 		}
 	}
 	
@@ -128,6 +129,12 @@ public class Main extends JavaPlugin {
 			playerData.setReputation(reputation);
 			dataPlayers.remove(player);
 			dataPlayers.put(player, playerData);
+			if(getReputation(player) < 0) {
+				if(getFaction(player) != Faction.NF) {
+					setFaction(player, Faction.NF);
+					heroriaMessage("Vous n'avez plus assez de points de réputation. Votre faction vous a abandonné...", player);
+				}
+			}
 		}
 	}
 	
@@ -149,7 +156,7 @@ public class Main extends JavaPlugin {
 	}
 	
 	public void ban(Player player, int duration, String reason, String by) {
-		sql.ban(player, duration, reason, by);
+		sql.ban(player.getUniqueId().toString(), duration, reason, by);
 		player.kickPlayer("Vous avez été bannis " + duration + " jour(s)" + " par " + by + " pour la raison suivante\n" + reason);
 	}
 	
@@ -183,46 +190,84 @@ public class Main extends JavaPlugin {
 		Rank rank = getRank(player);
 		switch(rank) {
 			case JOUEUR:
-				attachment.setPermission("heroria.player", true);
+				attachment.setPermission("minecraft.command.me", false);
+				attachment.setPermission("minecraft.command.msg", true);
+				attachment.setPermission("minecraft.command.help", true);
+				attachment.setPermission("bukkit.command.version", false);
+				attachment.setPermission("bukkit.command.plugins", false);
 				break;
 			case VIP1:
-				attachment.setPermission("heroria.player", true);
+				attachment.setPermission("minecraft.command.me", true);
+				attachment.setPermission("minecraft.command.msg", true);
+				attachment.setPermission("minecraft.command.help", true);
+				attachment.setPermission("bukkit.command.version", false);
+				attachment.setPermission("bukkit.command.plugins", false);
 				break;
 			case VIP2:
-				attachment.setPermission("heroria.player", true);
+				attachment.setPermission("minecraft.command.me", true);
+				attachment.setPermission("minecraft.command.msg", true);
+				attachment.setPermission("minecraft.command.help", true);
+				attachment.setPermission("bukkit.command.version", false);
+				attachment.setPermission("bukkit.command.plugins", false);
 				break;
 			case VIP3:
-				attachment.setPermission("heroria.player", true);
+				attachment.setPermission("minecraft.command.me", true);
+				attachment.setPermission("minecraft.command.msg", true);
+				attachment.setPermission("minecraft.command.help", true);
+				attachment.setPermission("bukkit.command.version", false);
+				attachment.setPermission("bukkit.command.plugins", false);
 				break;
 			case VIP4:
-				attachment.setPermission("heroria.player", true);
+				attachment.setPermission("minecraft.command.me", true);
+				attachment.setPermission("minecraft.command.msg", true);
+				attachment.setPermission("minecraft.command.help", true);
+				attachment.setPermission("bukkit.command.version", false);
+				attachment.setPermission("bukkit.command.plugins", false);
 				break;
 			case MODO:
 				attachment.setPermission("minecraft.command.kill", true);
-				attachment.setPermission("heroria.player", true);
-				attachment.setPermission("heroria.modo", true);
+				attachment.setPermission("minecraft.command.me", true);
+				attachment.setPermission("minecraft.command.msg", true);
+				attachment.setPermission("bukkit.command.version", false);
+				attachment.setPermission("bukkit.command.plugins", false);
+				attachment.setPermission("minecraft.command.tp", true);
 				break;
 			
 			case SM:
-				attachment.setPermission("minecraft.command.*", true);
-				attachment.setPermission("heroria.player", true);
-				attachment.setPermission("heroria.modo", true);
+				attachment.setPermission("minecraft.command.kill", true);
+				attachment.setPermission("minecraft.command.me", true);
+				attachment.setPermission("minecraft.command.msg", true);
+				attachment.setPermission("minecraft.command.ban", true);
+				attachment.setPermission("minecraft.command.tp", true);
 				break;
 				
 			case CM:
-				attachment.setPermission("minecraft.command.*", true);
+				attachment.setPermission("minecraft.command.kill", true);
+				attachment.setPermission("minecraft.command.me", true);
+				attachment.setPermission("minecraft.command.msg", true);
+				attachment.setPermission("minecraft.command.ban", true);
+				attachment.setPermission("bukkit.command.stop", true);
 				attachment.setPermission("bukkit.command.restart", true);
-				attachment.setPermission("heroria.*", true);
+				attachment.setPermission("minecraft.command.tp", true);
+				attachment.setPermission("minecraft.command.whitelist", true);
 				break;
 				
 			case ADMINISTRATEUR:
-				attachment.setPermission("*", true);
+				attachment.setPermission("minecraft.command.kill", true);
+				attachment.setPermission("minecraft.command.me", true);
+				attachment.setPermission("minecraft.command.msg", true);
+				attachment.setPermission("minecraft.command.ban", true);
+				attachment.setPermission("bukkit.command.stop", true);
+				attachment.setPermission("bukkit.command.restart", true);
+				attachment.setPermission("minecraft.command.tp", true);
+				attachment.setPermission("minecraft.command.whitelist", true);
 				break;
 				
 			default:
 				break;
 		
 		}
+		if(this.playerPermission.containsKey(player.getUniqueId())) this.playerPermission.remove(player.getUniqueId());
 		this.playerPermission.put(player.getUniqueId(), attachment);
 	}
 }

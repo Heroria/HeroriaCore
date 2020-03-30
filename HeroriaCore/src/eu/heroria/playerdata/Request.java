@@ -1,6 +1,5 @@
 package eu.heroria.playerdata;
 
-import java.security.Timestamp;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -153,11 +152,24 @@ public class Request {
 		}
 	}
 	
-	public boolean isBanned(Player player) {
+	public void unBan(String uuid) {
+		try {
+			PreparedStatement q = connection.prepareStatement("UPDATE ban SET duration = ? WHERE uuid = ?");
+			q.setInt(1, 0);
+			q.setString(2, uuid);
+			q.executeUpdate();
+			q.close();
+		} catch (SQLException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+	
+	public boolean isBanned(String uuid) {
 		//SELECT
 		try {
             PreparedStatement q = connection.prepareStatement("SELECT date,duration FROM ban WHERE uuid = ?");
-            q.setString(1, player.getUniqueId().toString());
+            q.setString(1, uuid);
             ResultSet resultat = q.executeQuery();;
             Time expireDate = new Time(0);
             while(resultat.next()) {
@@ -175,10 +187,10 @@ public class Request {
         return false;
 	}
 	
-	public String getBanReason(Player player) {
+	public String getBanReason(String uuid) {
 		try {
             PreparedStatement q = connection.prepareStatement("SELECT date,duration,reason FROM ban WHERE uuid = ?");
-            q.setString(1, player.getUniqueId().toString());
+            q.setString(1, uuid);
             ResultSet resultat = q.executeQuery();
             Time expireDate = new Time(0);
             while(resultat.next()) {
@@ -194,11 +206,11 @@ public class Request {
 		return null;
 	}
 	
-	public void ban(Player player, int duration, String reason, String by) {
+	public void ban(String uuid, int duration, String reason, String by) {
 		try {
-			System.out.println("Ban " + player.getName() + " during " + duration + "by " + by + " because: " + reason + " ... ");
+			System.out.println("Ban " + uuid + " during " + duration + "by " + by + " because: " + reason + ".");
             PreparedStatement q = connection.prepareStatement("INSERT INTO ban(uuid,duration,reason,bannedby) VALUES (?,?,?,?)");
-            q.setString(1, player.getUniqueId().toString());
+            q.setString(1, uuid);
             q.setInt(2, duration);
             q.setString(3, reason);
             q.setString(4, by);

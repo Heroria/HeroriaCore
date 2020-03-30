@@ -19,3 +19,9 @@
    
    rank:
      description: Définir le rank d'un utilisateur
+     
+   ban:
+     description: Bannir un joueur du serveur
+     
+   pardon:
+     description: Débannir un joueur du serveur

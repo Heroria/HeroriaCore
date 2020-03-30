@@ -1,20 +1,19 @@
 package eu.heroria;
 
-import java.util.function.Function;
-
-import org.apache.logging.log4j.core.pattern.AbstractStyleNameConverter.White;
 import org.bukkit.Bukkit;
+import org.bukkit.ChatColor;
 import org.bukkit.Material;
+import org.bukkit.OfflinePlayer;
 import org.bukkit.World;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Entity;
-import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.block.BlockFromToEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
+import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerKickEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
@@ -44,9 +43,12 @@ public class Listener implements org.bukkit.event.Listener, CommandExecutor {
 	
 	@EventHandler
 	public void onJoin(PlayerJoinEvent event) {
+		if(!pl.sql.isConnected()) {
+			pl.sql.connection();
+		}
 		Player player = event.getPlayer();
-		if(pl.sql.isBanned(player)) {
-			player.kickPlayer("Vous êtes bannis\nVous avez été bannis pour la raison suivante: " + pl.sql.getBanReason(player));
+		if(pl.sql.isBanned(player.getUniqueId().toString())) {
+			player.kickPlayer("Vous êtes bannis\nVous avez été bannis pour la raison suivante: " + pl.sql.getBanReason(player.getUniqueId().toString()));
 		}
 		player.setCustomName(player.getDisplayName());
 		pl.sql.createAccount(player);
@@ -73,6 +75,9 @@ public class Listener implements org.bukkit.event.Listener, CommandExecutor {
 		Player player = event.getPlayer();
 		pl.dataManager.savePlayerData(player);
 		pl.scoreBoard.remove(player);
+		pl.playerPermission.remove(player.getUniqueId());
+		pl.dataPlayers.remove(player);
+		event.setQuitMessage(null);
 	}
 	
 	@EventHandler
@@ -80,6 +85,9 @@ public class Listener implements org.bukkit.event.Listener, CommandExecutor {
 		Player player = event.getPlayer();
 		pl.dataManager.savePlayerData(player);
 		pl.scoreBoard.remove(player);
+		pl.playerPermission.remove(player.getUniqueId());
+		pl.dataPlayers.remove(player);
+		event.setLeaveMessage(null);
 	}
 	
 	@EventHandler
@@ -89,11 +97,111 @@ public class Listener implements org.bukkit.event.Listener, CommandExecutor {
 		}
 	}
 	
+	@EventHandler
+	public void onPreCommand(PlayerCommandPreprocessEvent event) {
+		String[] label = event.getMessage().split(" ");
+		Player player = event.getPlayer();
+		if(label[0].contains("/help")) {
+			event.setCancelled(true);
+			player.sendMessage(new String[]{"§e--------------------------------------------------", " ", "§l/shop:§r Accéder à la boutique", " ", "§l/lobby:§r Retournez sur le lobby", " ", "§l/hub:§r Retournez sur le lobby", " ", "§l/me:§r Afficher un message de statut (grade " + ChatColor.stripColor(Rank.VIP1.getName()) +" minimum)", " ", "§e--------------------------------------------------"});
+		}
+		else if(label[0].contains("/ban")) {
+			event.setCancelled(true);
+			if(player.hasPermission("minecraft.command.ban")) {
+				if(label.length == 1) {
+					pl.heroriaMessage("Faites /ban [player] (reason).", player);
+					return;
+				}
+				try {
+					Player pTo = Bukkit.getPlayer(label[1]);
+					if(label.length == 2) {
+						player.openInventory(pl.playerGUI.sanctionInterface(pTo));
+					}
+					else if(label.length > 2) {
+						label[0] = null;
+						label[1] = null;
+						String reason = null;
+						for (String string : label) {
+							reason = reason + string + " ";
+						}
+						pl.ban(pTo, 1000, reason, player.getName());
+						pl.heroriaMessage("Le joueur " + pTo.getName() + " a été banni pour très longtemps.", player);
+					}
+				} catch (NullPointerException e) {
+					try{
+						OfflinePlayer offlinePlayer = Bukkit.getOfflinePlayer(label[1]);
+						if(label.length == 2) {
+							pl.sql.ban(offlinePlayer.getUniqueId().toString(), 1000, "Motif indéfini", player.getName());
+							return;
+						}
+						else if(label.length > 2) {
+							label[0] = null;
+							label[1] = null;
+							String reason = null;
+							for (String string : label) {
+								reason = reason + string + " ";
+							}
+							pl.sql.ban(offlinePlayer.getUniqueId().toString(), 1000, reason, player.getName());
+							pl.heroriaMessage("Le joueur " + offlinePlayer.getName() + " a été banni pour très longtemps.", player);
+							return;
+						}
+					} catch (NullPointerException e2) {
+						pl.heroriaMessage("Joueur introuvable !", player);
+					}
+				}
+				
+			}
+			else {
+				pl.heroriaMessage("Vous n'avez pas la permission d'exécuter cette commande !", player);
+			}
+		}
+		
+		else if(label[0].contains("/pardon")) {
+			event.setCancelled(true);
+			if(player.hasPermission("minecraft.comman.pardon")) {
+				if(label.length == 1) {
+					pl.heroriaMessage("Faites /pardon [player].", player);
+					return;
+				}
+				else if (label.length > 2) {
+					pl.heroriaMessage("Faites simplement /pardon [player].", player);
+					return;
+				}
+				try {
+					Player pTo = Bukkit.getPlayer(label[1]);
+					if(label.length == 2) {
+						player.openInventory(pl.playerGUI.sanctionInterface(pTo));
+					}
+					else if(label.length > 2) {
+						label[0] = null;
+						label[1] = null;
+						String reason = null;
+						for (String string : label) {
+							reason = reason + string + " ";
+						}
+						pl.sql.unBan(pTo.getUniqueId().toString());
+						pl.heroriaMessage("Le joueur " + pTo.getName() + " a été débanni.", player);
+					}
+				} catch (NullPointerException e) {
+					try{
+						OfflinePlayer offlinePlayer = Bukkit.getOfflinePlayer(label[1]);
+						pl.sql.unBan(offlinePlayer.getUniqueId().toString());
+					} catch (NullPointerException e2) {
+						pl.heroriaMessage("Joueur introuvable !", player);
+					}
+				}
+			}
+			else {
+				pl.heroriaMessage("Vous n'avez pas la permission d'exécuter cette commande !", player);
+			}
+		}
+	}
+	
 	@Override
 	public boolean onCommand(CommandSender sender, Command cmd, String label, String[] args) {
 		if(cmd.getLabel().equalsIgnoreCase("player")) {
 			if(!(sender instanceof Player)) {
-				sender.sendMessage("Action impossible");
+				sender.sendMessage("Action impossible !");
 				return true;
 			}
 			
