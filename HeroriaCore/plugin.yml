@@ -1,8 +1,8 @@
  name: HeroriaCore
- version: 2.0
+ version: 1.0
  description: Bibliothèque pour les plugins Heroria.
  author: alphaice
- main: eu.heroria.Main
+ main: eu.heroria.heroriacore.HeroriaCore
  api-version: 1.13
  commands:
    player:
@@ -25,3 +25,11 @@
      
    pardon:
      description: Débannir un joueur du serveur
+     
+   friend:
+     description: Gérer ses amis
+     
+   test:
+     description: Commande de test
+   test2:
+     description: Commande de test

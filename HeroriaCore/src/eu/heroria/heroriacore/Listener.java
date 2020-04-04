@@ -1,4 +1,4 @@
-package eu.heroria;
+package eu.heroria.heroriacore;
 
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
@@ -18,14 +18,16 @@ import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerKickEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.server.PluginDisableEvent;
+import org.bukkit.inventory.Inventory;
 
-import eu.heroria.gui.CustomScoreBoardManager;
-import eu.heroria.playerdata.Rank;
+import eu.heroria.heroriacore.gui.CustomScoreBoardManager;
+import eu.heroria.heroriacore.playerdata.Rank;
+import eu.heroria.heroriacore.proxy.ProxyResult;
 
 public class Listener implements org.bukkit.event.Listener, CommandExecutor {
-	private Main pl;
+	private HeroriaCore pl;
 	
-	public Listener(Main pl) {
+	public Listener(HeroriaCore pl) {
 		this.pl = pl;
 	}
 	
@@ -43,22 +45,40 @@ public class Listener implements org.bukkit.event.Listener, CommandExecutor {
 	
 	@EventHandler
 	public void onJoin(PlayerJoinEvent event) {
+		event.setJoinMessage(null);
 		if(!pl.sql.isConnected()) {
 			pl.sql.connection();
 		}
 		Player player = event.getPlayer();
+		Thread t = new Thread() {
+			public void run() {
+				pl.sql.createAccount(player);
+				pl.dataManager.loadPlayerData(player);
+				pl.setupPermissions(player);
+				if(pl.getRank(player).getJoinMessage() == true) event.setJoinMessage(player.getCustomName() + " vient de se connecter.");
+				ProxyResult proxyResult = pl.iop.getIp(player);
+				Bukkit.getLogger().info(player.getName() + " IP: " + proxyResult.getStringResult() + ":" + proxyResult.getIntResult());
+				if(pl.isHub()) {
+					int friendsRequest = pl.sql.getFriendRequest(player).size();
+					if(friendsRequest > 1) player.sendMessage(new String[] {" ", " ", "Bon retour parmi nous " + player.getName() + " !", " ", "Vous avez " + friendsRequest + " requête(s) d'ami(s) en attente.", "Faites /friend pour en savoir plus", " ", " "});
+					else player.sendMessage(new String[] {" ", " ", "Bon retour parmi nous " + player.getName() + " !", " ", " "});
+				}
+			}
+		};
 		if(pl.sql.isBanned(player.getUniqueId().toString())) {
 			player.kickPlayer("Vous êtes bannis\nVous avez été bannis pour la raison suivante: " + pl.sql.getBanReason(player.getUniqueId().toString()));
 		}
+		t.start();
 		player.setCustomName(player.getDisplayName());
-		pl.sql.createAccount(player);
-		pl.dataManager.loadPlayerData(player);
-		pl.setupPermissions(player);
-		if(pl.getRank(player).getJoinMessage()) event.setJoinMessage(player.getCustomName() + " vient de se connecter");
-		else event.setJoinMessage(null);
-		CustomScoreBoardManager board = new CustomScoreBoardManager(pl, player);
-		board.sendLine();
-		board.setScoreboard();
+		if(pl.isHub()) {
+			CustomScoreBoardManager board = new CustomScoreBoardManager(pl, player);
+			board.sendLine();
+			board.setScoreboard();
+		}
+		if(pl.teleportIOP.containsKey(player.getName())) {
+			player.teleport(pl.teleportIOP.get(player.getName()).getLocation());
+			pl.teleportIOP.remove(player.getName());
+		}
 	}
 	
 	@EventHandler
@@ -73,10 +93,15 @@ public class Listener implements org.bukkit.event.Listener, CommandExecutor {
 	@EventHandler
 	public void onQuit(PlayerQuitEvent event) {
 		Player player = event.getPlayer();
-		pl.dataManager.savePlayerData(player);
-		pl.scoreBoard.remove(player);
-		pl.playerPermission.remove(player.getUniqueId());
-		pl.dataPlayers.remove(player);
+		Thread t = new Thread() {
+			public void run() {
+				pl.dataManager.savePlayerData(player);
+				pl.scoreBoard.remove(player);
+				pl.playerPermission.remove(player.getUniqueId());
+				pl.dataPlayers.remove(player);
+			}
+		};
+		t.start();
 		event.setQuitMessage(null);
 	}
 	
@@ -124,14 +149,15 @@ public class Listener implements org.bukkit.event.Listener, CommandExecutor {
 						for (String string : label) {
 							reason = reason + string + " ";
 						}
-						pl.ban(pTo, 1000, reason, player.getName());
+						pl.ban(pTo, 1000, reason, player);
 						pl.heroriaMessage("Le joueur " + pTo.getName() + " a été banni pour très longtemps.", player);
 					}
 				} catch (NullPointerException e) {
 					try{
 						OfflinePlayer offlinePlayer = Bukkit.getOfflinePlayer(label[1]);
 						if(label.length == 2) {
-							pl.sql.ban(offlinePlayer.getUniqueId().toString(), 1000, "Motif indéfini", player.getName());
+							pl.sql.ban(offlinePlayer.getUniqueId().toString(), 1000, "Motif indéfini", player);
+							pl.heroriaMessage("Le joueur " + offlinePlayer.getName() + " a été banni pour très longtemps.", player);
 							return;
 						}
 						else if(label.length > 2) {
@@ -141,7 +167,7 @@ public class Listener implements org.bukkit.event.Listener, CommandExecutor {
 							for (String string : label) {
 								reason = reason + string + " ";
 							}
-							pl.sql.ban(offlinePlayer.getUniqueId().toString(), 1000, reason, player.getName());
+							pl.sql.ban(offlinePlayer.getUniqueId().toString(), 1000, reason, player);
 							pl.heroriaMessage("Le joueur " + offlinePlayer.getName() + " a été banni pour très longtemps.", player);
 							return;
 						}
@@ -155,10 +181,27 @@ public class Listener implements org.bukkit.event.Listener, CommandExecutor {
 				pl.heroriaMessage("Vous n'avez pas la permission d'exécuter cette commande !", player);
 			}
 		}
-		
+		else if(label[0].contains("/tp")) {
+			event.setCancelled(true);
+			if(player.hasPermission("minecraft.command.tp")) {
+				if(label.length == 1) {
+					pl.heroriaMessage("Faites /tp [player].", player);
+				}
+				else if(label.length > 2) {
+					pl.heroriaMessage("Faites simplement /tp [player].", player);
+				}
+				else if(label.length == 2) {
+					try {
+						player.teleport(Bukkit.getPlayer(label[2]).getLocation());
+					} catch (NullPointerException e) {
+						pl.iop.teleport(player, label[1]);
+					}
+				}
+			}
+		}
 		else if(label[0].contains("/pardon")) {
 			event.setCancelled(true);
-			if(player.hasPermission("minecraft.comman.pardon")) {
+			if(player.hasPermission("minecraft.command.pardon")) {
 				if(label.length == 1) {
 					pl.heroriaMessage("Faites /pardon [player].", player);
 					return;
@@ -169,23 +212,23 @@ public class Listener implements org.bukkit.event.Listener, CommandExecutor {
 				}
 				try {
 					Player pTo = Bukkit.getPlayer(label[1]);
-					if(label.length == 2) {
-						player.openInventory(pl.playerGUI.sanctionInterface(pTo));
+					if(pl.sql.isBanned(pTo.getUniqueId().toString())) {
+						pl.heroriaMessage("Le joueur n'est pas banni !", player);
+						return;
 					}
-					else if(label.length > 2) {
-						label[0] = null;
-						label[1] = null;
-						String reason = null;
-						for (String string : label) {
-							reason = reason + string + " ";
-						}
-						pl.sql.unBan(pTo.getUniqueId().toString());
-						pl.heroriaMessage("Le joueur " + pTo.getName() + " a été débanni.", player);
-					}
+					pl.sql.unBan(pTo.getUniqueId().toString());
+					pl.sql.logAction(Action.PARDON, null, player, pTo);
+					pl.heroriaMessage("Le joueur " + pTo.getName() + " a été débanni.", player);
 				} catch (NullPointerException e) {
 					try{
 						OfflinePlayer offlinePlayer = Bukkit.getOfflinePlayer(label[1]);
+						if(pl.sql.isBanned(offlinePlayer.getUniqueId().toString())) {
+							pl.heroriaMessage("Le joueur n'est pas banni !", player);
+							return;
+						}
 						pl.sql.unBan(offlinePlayer.getUniqueId().toString());
+						pl.sql.logAction(Action.PARDON, null, player, offlinePlayer.getPlayer());
+						pl.heroriaMessage("Le joueur " + offlinePlayer.getName() + " a été débanni.", player);
 					} catch (NullPointerException e2) {
 						pl.heroriaMessage("Joueur introuvable !", player);
 					}
@@ -225,6 +268,66 @@ public class Listener implements org.bukkit.event.Listener, CommandExecutor {
 				pl.heroriaMessage("Joueur introuvable !", player);
 			}
 		}
+		else if(cmd.getLabel().equalsIgnoreCase("friend")) {
+			if(!(sender instanceof Player)) {
+				sender.sendMessage("Action impossible !");
+				return true;
+			}
+			
+			Player player = (Player) sender;
+			if(args.length == 0) {
+				Inventory inv = pl.friendGUI.friendInterface(player);
+				player.openInventory(inv);
+				return false;
+			}
+			if(args.length == 1) {
+				pl.heroriaMessage("Faites /friend [add/remove] [player]", player);
+				return true;
+			}
+			else if(args.length == 2) {
+				try{
+					Player pTo = Bukkit.getPlayer(args[1]);
+					if(args[0].equalsIgnoreCase("add")) {
+						if(pl.sql.isRequested(player, pTo.getUniqueId().toString())) {
+							pl.sql.acceptFriendRequest(pTo.getUniqueId().toString(), player);
+							pl.heroriaMessage("Vous avez accepté la demande d'ami de " + pTo.getName() + " !", player);
+						}
+						else {
+							pl.sql.requestFriend(player, pTo.getUniqueId().toString());
+							pl.heroriaMessage("Une demande d'ami a été envoyé à " + pTo.getName() + " !", player);
+						}
+					}
+					else if(args[0].equalsIgnoreCase("remove")) {
+						if(pl.sql.isFriend(player, pTo.getUniqueId().toString())) {
+							pl.sql.removeFriend(player.getUniqueId().toString(), pTo.getUniqueId().toString());
+						}
+					}
+				} catch (NullPointerException e) {
+					try {
+						OfflinePlayer pTo = Bukkit.getOfflinePlayer(args[1]);
+						if(args[0].equalsIgnoreCase("add")) {
+							if(pl.sql.isRequested(player, pTo.getUniqueId().toString())) {
+								pl.sql.acceptFriendRequest(pTo.getUniqueId().toString(), player);
+								pl.heroriaMessage("Vous avez accepté la demande d'ami de " + pTo.getName() + " !", player);
+							}
+							else {
+								pl.sql.requestFriend(player, pTo.getUniqueId().toString());
+								pl.heroriaMessage("Une demande d'ami a été envoyé à " + pTo.getName() + " !", player);
+							}
+						}
+						else if(args[0].equalsIgnoreCase("remove")) {
+							if(pl.sql.isFriend(player, pTo.getUniqueId().toString())) {
+								pl.sql.removeFriend(player.getUniqueId().toString(), pTo.getUniqueId().toString());
+							}
+						}
+					} catch (NullPointerException e2) {
+						e2.printStackTrace();
+						pl.heroriaMessage("Joueur introuvable !", player);
+						return true;
+					}
+				}
+			}
+		}
 		else if(cmd.getLabel().equalsIgnoreCase("warn")) {
 			if(sender instanceof Player) {
 				Player player = (Player) sender;
@@ -244,7 +347,7 @@ public class Listener implements org.bukkit.event.Listener, CommandExecutor {
 						return true;
 					}
 					if(argsN == 1) {
-						pl.warnPlayer(pTo, null, player.getName());
+						pl.warnPlayer(pTo, null, player);
 						pl.heroriaMessage("Le joueur a reçu un avertissement.", player);
 						return false;
 					}
@@ -255,7 +358,7 @@ public class Listener implements org.bukkit.event.Listener, CommandExecutor {
 							reason = reason + args[current] + " ";
 							current = current + 1;
 						}
-						pl.warnPlayer(pTo, reason, player.getName());
+						pl.warnPlayer(pTo, reason, player);
 						pl.heroriaMessage("Le joueur a reçu un avertissement pour: ' " + reason + "'.", player);
 					}
 				} catch (NullPointerException e) {
@@ -271,7 +374,7 @@ public class Listener implements org.bukkit.event.Listener, CommandExecutor {
 				try {
 					Player pTo = Bukkit.getPlayer(args[0]);
 					if(argsN == 1) {
-						pl.warnPlayer(pTo, null, "Heroria");
+						pl.warnPlayer(pTo, null, null);
 						sender.sendMessage("§4[Heroria]§r Le joueur a reçu un avertissement.");
 						return false;
 					}
@@ -282,7 +385,7 @@ public class Listener implements org.bukkit.event.Listener, CommandExecutor {
 							reason = reason + args[current] + " ";
 							current = current + 1;
 						}
-						pl.warnPlayer(pTo, reason, "Heroria");
+						pl.warnPlayer(pTo, reason, null);
 						sender.sendMessage("§4[Heroria]§r Le joueur a reçu un avertissement pour: ' " + reason + "'.");
 					}
 				} catch (NullPointerException e) {
@@ -304,6 +407,7 @@ public class Listener implements org.bukkit.event.Listener, CommandExecutor {
 				pl.setMoney(pTo, pl.getMoney(pTo) + 50);
 				pl.setReputation(pTo, pl.getReputation(pTo) + 10);
 				pTo.setTotalExperience(pTo.getTotalExperience() + 10);
+				pl.sql.logAction(Action.REC, null, null, pTo);
 			} catch (NullPointerException e) {
 				sender.sendMessage("§4[Heroria] §rJoueur introuvable !");
 			}
@@ -361,6 +465,7 @@ public class Listener implements org.bukkit.event.Listener, CommandExecutor {
 						}
 						
 						pl.heroriaMessage("Le grade " + rank.getName() + " a été défini pour le joueur " + pTo.getName() + ".", player);
+						pl.sql.logAction(Action.RANK, "set " + rank.getTechName() + " (before: " + pl.getRank(player) + ")", player, pTo);
 						pl.setRank(pTo, rank);
 					}
 				} catch (NullPointerException e) {
@@ -408,11 +513,16 @@ public class Listener implements org.bukkit.event.Listener, CommandExecutor {
 						return true;
 					}
 					sender.sendMessage("§4[Heroria]§r Le grade " + rank.getName() + " a été défini pour le joueur " + pTo.getName() + ".");
+					pl.sql.logAction(Action.RANK, "set " + rank.getTechName() + " (before: " + pl.getRank(pTo) + ")", null, pTo);
 					pl.setRank(pTo, rank);
 				} catch (NullPointerException e) {
 					sender.sendMessage("§4[Heroria]§r Joueur introuvable !");
 				}
 			}
+		}
+		else if(cmd.getLabel().equalsIgnoreCase("test2")) {
+			pl.iop.test((Player)sender);
+			
 		}
 		else if(cmd.getLabel().equalsIgnoreCase("shop")) {
 			if(!(sender instanceof Player)) {
